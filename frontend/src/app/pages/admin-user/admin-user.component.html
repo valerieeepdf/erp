@@ -1,0 +1,268 @@
+<p-toast />
+
+<div class="admin-layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="pi pi-ticket"></i></div>
+      <span class="logo-text">ERPJir</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item" routerLink="/dashboard">
+        <i class="pi pi-home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a class="nav-item" routerLink="/tickets">
+        <i class="pi pi-list"></i>
+        <span>Tickets</span>
+      </a>
+      @if (permissionService.hasPermission('groups:manage')) {
+        <a class="nav-item" routerLink="/admin/groups">
+          <i class="pi pi-users"></i>
+          <span>Grupos</span>
+        </a>
+      }
+      @if (permissionService.hasPermission('users:manage')) {
+        <a class="nav-item active" routerLink="/admin/users">
+          <i class="pi pi-user"></i>
+          <span>Usuarios</span>
+        </a>
+      }
+      <a class="nav-item" routerLink="/profile">
+        <i class="pi pi-id-card"></i>
+        <span>Perfil</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+  <div class="user-info">
+    <div class="user-avatar">{{ getInitials(user()?.name || '') }}</div>
+    <div class="user-details">
+      <span class="user-name">{{ user()?.name }}</span>
+      <span class="user-username">@{{ user()?.username }}</span>
+    </div>
+  </div>
+  <button class="logout-btn" (click)="logout()">
+    <i class="pi pi-power-off"></i> Cerrar sesión
+  </button>
+</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Directorio y Accesos</h1>
+        <p>Gestiona todos los usuarios de la plataforma y sus permisos otorgables.</p>
+      </div>
+      <div class="header-actions">
+        <div class="search-box">
+          <i class="pi pi-search"></i>
+          <input
+            type="text"
+            [(ngModel)]="searchText"
+            placeholder="Buscar por nombre, email, grupo..."
+          />
+        </div>
+        <button class="refresh-btn" (click)="refreshUsers()">
+          <i class="pi pi-refresh"></i> Actualizar
+        </button>
+      </div>
+    </div>
+
+    <!-- USERS TABLE -->
+    <div class="users-table-container">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>
+              <div class="th-content">
+                Nombre y Rol
+                <i class="pi pi-sort-alt"></i>
+              </div>
+            </th>
+            <th>
+              <div class="th-content">
+                Correo Institucional
+                <i class="pi pi-sort-alt"></i>
+              </div>
+            </th>
+            <th>Grupo Asignado</th>
+            <th>Accesos</th>
+            <th>Opciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of filteredUsers; track u.id) {
+            <tr>
+              <td>
+                <div class="user-cell">
+                  <div class="user-avatar-sm">{{ getInitials(u.name) }}</div>
+                  <div class="user-cell-info">
+                    <span class="user-cell-name">{{ u.name }}</span>
+                    <span class="user-cell-role">
+                      @if (permissionService.hasPermission('users:manage')) {
+                        Administrador
+                      } @else {
+                        Sin puesto definido
+                      }
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td>{{ u.email }}</td>
+              <td>
+                <div class="group-chips">
+                  @for (member of u.groupMembers; track member.id) {
+                    <span class="group-chip">{{ getGroupName(member.groupId) }}</span>
+                  }
+                  @if (u.groupMembers?.length === 0) {
+                    <span class="no-group-text">Sin asignar</span>
+                  }
+                </div>
+              </td>
+              <td>
+                @if (u.groupMembers?.length > 0) {
+                  <button class="review-btn" (click)="openPermissionsDialog(u)">
+                    <i class="pi pi-shield"></i> Revisar
+                  </button>
+                } @else {
+                  <span class="no-access-badge">Ninguno</span>
+                }
+              </td>
+              <td>
+                <div class="action-buttons" *appHasPermission="'users:manage'">
+                  <button class="icon-btn edit" (click)="openEditDialog(u)" title="Editar">
+                    <i class="pi pi-pencil"></i>
+                  </button>
+                  <button class="icon-btn permissions" (click)="openPermissionsDialog(u)" title="Permisos">
+                    <i class="pi pi-shield"></i>
+                  </button>
+                  <button class="icon-btn delete" title="Eliminar">
+                    <i class="pi pi-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+          @if (filteredUsers.length === 0) {
+            <tr>
+              <td colspan="5" class="empty-table">No hay usuarios que coincidan</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- PAGINATION -->
+      <div class="pagination">
+        <button class="page-btn" (click)="currentPage = 0" [disabled]="currentPage === 0">
+          <i class="pi pi-angle-double-left"></i>
+        </button>
+        <button class="page-btn" (click)="currentPage = currentPage - 1" [disabled]="currentPage === 0">
+          <i class="pi pi-angle-left"></i>
+        </button>
+        <span class="page-info">{{ currentPage + 1 }}</span>
+        <button class="page-btn" (click)="currentPage = currentPage + 1">
+          <i class="pi pi-angle-right"></i>
+        </button>
+        <button class="page-btn">
+          <i class="pi pi-angle-double-right"></i>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- DIALOG EDITAR USUARIO -->
+<p-dialog
+  header="Editar Usuario"
+  [visible]="showEditDialog()"
+  (visibleChange)="showEditDialog.set($event)"
+  [modal]="true"
+  [style]="{ width: '440px' }"
+  [draggable]="false"
+>
+  <div class="dialog-form">
+    <div class="field">
+      <label>Nombre completo *</label>
+      <input pInputText [(ngModel)]="editForm.name" placeholder="Nombre completo" class="w-full" />
+    </div>
+    <div class="field">
+      <label>Email *</label>
+      <input pInputText [(ngModel)]="editForm.email" placeholder="Email" class="w-full" />
+    </div>
+    <div class="field">
+      <label>Username *</label>
+      <input pInputText [(ngModel)]="editForm.username" placeholder="Username" class="w-full" />
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancelar" [text]="true" styleClass="cancel-btn" (onClick)="showEditDialog.set(false)" />
+    <p-button label="Guardar cambios" styleClass="save-btn" (onClick)="saveUser()" />
+  </ng-template>
+</p-dialog>
+
+<!-- DIALOG PERMISOS -->
+<p-dialog
+  header="Gestionar Permisos"
+  [visible]="showPermissionsDialog()"
+  (visibleChange)="showPermissionsDialog.set($event)"
+  [modal]="true"
+  [style]="{ width: '500px' }"
+  [draggable]="false"
+>
+  <div class="dialog-form">
+    <div class="user-perms-header">
+      <div class="user-avatar-lg">{{ getInitials(selectedUserForPerms()?.name || '') }}</div>
+      <div>
+        <h3>{{ selectedUserForPerms()?.name }}</h3>
+        <p>@{{ selectedUserForPerms()?.username }}</p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Selecciona un Grupo</label>
+      <div class="group-select-list">
+        @for (group of groups(); track group.id) {
+          <div
+            class="group-select-item"
+            [class.active]="selectedGroupId === group.id"
+            (click)="onGroupSelectForPerms(group.id)"
+          >
+            <div class="group-select-icon"><i class="pi pi-users"></i></div>
+            <span>{{ group.name }}</span>
+            @if (selectedGroupId === group.id) {
+              <i class="pi pi-check-circle" style="color: #7c3aed; margin-left: auto;"></i>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (selectedGroupId) {
+      <div class="field">
+        <label>Permisos en "{{ getGroupName(selectedGroupId) }}"</label>
+        <div class="permissions-grid">
+          @for (perm of availablePermissions; track perm) {
+            <div
+              class="permission-toggle"
+              [class.active]="selectedPermissions.includes(perm)"
+              (click)="togglePermission(perm)"
+            >
+              <i class="pi"
+                [class.pi-check-circle]="selectedPermissions.includes(perm)"
+                [class.pi-circle]="!selectedPermissions.includes(perm)"
+              ></i>
+              <span>{{ getPermissionLabel(perm) }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancelar" [text]="true" styleClass="cancel-btn" (onClick)="showPermissionsDialog.set(false)" />
+    <p-button label="Guardar permisos" styleClass="save-btn" (onClick)="savePermissions()" />
+  </ng-template>
+</p-dialog>

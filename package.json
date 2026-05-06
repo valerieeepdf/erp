@@ -1,0 +1,20 @@
+{
+  "name": "erpjir",
+  "version": "1.0.0",
+  "description": "ERP de tickets - Monorepo",
+  "private": true,
+  "workspaces": [
+    "backend/services/apigateway",
+    "backend/services/user",
+    "backend/services/groups",
+    "backend/services/tickets",
+    "frontend"
+  ],
+  "scripts": {
+    "start:gateway": "cd backend/services/apigateway && npm run start",
+    "start:user": "cd backend/services/user && npm run start",
+    "start:groups": "cd backend/services/groups && npm run start",
+    "start:tickets": "cd backend/services/tickets && npm run start",
+    "start:frontend": "cd frontend && npm run start"
+  }
+}

@@ -1,0 +1,259 @@
+<p-toast />
+<p-confirmDialog />
+
+<div class="admin-layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="pi pi-ticket"></i></div>
+      <span class="logo-text">ERPJir</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item" routerLink="/dashboard">
+        <i class="pi pi-home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a class="nav-item" routerLink="/tickets">
+        <i class="pi pi-list"></i>
+        <span>Tickets</span>
+      </a>
+      <a class="nav-item active">
+        <i class="pi pi-users"></i>
+        <span>Grupos</span>
+      </a>
+      @if (permissionService.hasPermission('users:manage')) {
+        <a class="nav-item" routerLink="/admin/users">
+          <i class="pi pi-user"></i>
+          <span>Usuarios</span>
+        </a>
+      }
+      <a class="nav-item" routerLink="/profile">
+        <i class="pi pi-id-card"></i>
+        <span>Perfil</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+  <div class="user-info">
+    <div class="user-avatar">{{ getInitials(user()?.name || '') }}</div>
+    <div class="user-details">
+      <span class="user-name">{{ user()?.name }}</span>
+      <span class="user-username">@{{ user()?.username }}</span>
+    </div>
+  </div>
+  <button class="logout-btn" (click)="logout()">
+    <i class="pi pi-power-off"></i> Cerrar sesión
+  </button>
+</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Gestión de Grupos</h1>
+        <p>Crea y administra los grupos de trabajo</p>
+      </div>
+      <button
+        *appHasPermission="'groups:manage'"
+        class="add-btn"
+        (click)="openCreateDialog()"
+      >
+        <i class="pi pi-plus"></i> Nuevo Grupo
+      </button>
+    </div>
+
+    <!-- GROUPS GRID -->
+    <div class="groups-grid">
+      @for (group of groups(); track group.id) {
+        <div class="group-card">
+          <div class="group-card-header">
+            <div class="group-icon">
+              <i class="pi pi-users"></i>
+            </div>
+            <div class="group-actions">
+              <button
+                *appHasPermission="'groups:manage'"
+                class="icon-btn edit"
+                (click)="openEditDialog(group)"
+                title="Editar"
+              >
+                <i class="pi pi-pencil"></i>
+              </button>
+              <button
+                class="icon-btn members"
+                (click)="openMembersDialog(group)"
+                title="Ver miembros"
+              >
+                <i class="pi pi-eye"></i>
+              </button>
+              <button
+                *appHasPermission="'groups:manage'"
+                class="icon-btn assign"
+                (click)="openAssignDialog(group)"
+                title="Asignar usuario"
+              >
+                <i class="pi pi-user-plus"></i>
+              </button>
+              <button
+                *appHasPermission="'groups:manage'"
+                class="icon-btn delete"
+                (click)="confirmDeleteGroup(group)"
+                title="Eliminar"
+              >
+                <i class="pi pi-trash"></i>
+              </button>
+            </div>
+          </div>
+
+          <h3>{{ group.name }}</h3>
+          <p>{{ group.description || 'Sin descripción' }}</p>
+
+          <div class="group-meta">
+            <span><i class="pi pi-users"></i> {{ group.members?.length || 0 }} miembro(s)</span>
+          </div>
+
+          @if (group.members?.length > 0) {
+            <div class="permissions-summary">
+              <span class="perms-count">
+                <i class="pi pi-shield"></i>
+                {{ group.members.length }} usuario(s) con permisos asignados
+              </span>
+              <button class="view-perms-btn" (click)="openMembersDialog(group)">
+                Ver detalle
+              </button>
+            </div>
+          }
+        </div>
+      }
+
+      @if (groups().length === 0) {
+        <div class="empty-state">
+          <i class="pi pi-users"></i>
+          <p>No hay grupos creados</p>
+          <button class="add-btn" (click)="openCreateDialog()">Crear primer grupo</button>
+        </div>
+      }
+    </div>
+  </main>
+</div>
+
+<!-- DIALOG GRUPO -->
+<p-dialog
+  [header]="editingGroup() ? 'Editar Grupo' : 'Nuevo Grupo'"
+  [visible]="showGroupDialog()"
+  (visibleChange)="showGroupDialog.set($event)"
+  [modal]="true"
+  [style]="{ width: '440px' }"
+  [draggable]="false"
+>
+  <div class="dialog-form">
+    <div class="field">
+      <label>Nombre *</label>
+      <input pInputText [(ngModel)]="groupForm.name" placeholder="Nombre del grupo" class="w-full" />
+    </div>
+    <div class="field">
+      <label>Descripción</label>
+      <input pInputText [(ngModel)]="groupForm.description" placeholder="Descripción opcional" class="w-full" />
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancelar" [text]="true" styleClass="cancel-btn" (onClick)="showGroupDialog.set(false)" />
+    <p-button [label]="editingGroup() ? 'Actualizar' : 'Crear'" styleClass="save-btn" (onClick)="saveGroup()" />
+  </ng-template>
+</p-dialog>
+
+<!-- DIALOG ASIGNAR -->
+<p-dialog
+  header="Asignar Usuario al Grupo"
+  [visible]="showAssignDialog()"
+  (visibleChange)="showAssignDialog.set($event)"
+  [modal]="true"
+  [style]="{ width: '500px' }"
+  [draggable]="false"
+>
+  <div class="dialog-form">
+    <div class="field">
+      <label>Selecciona un Usuario *</label>
+      <div class="users-list-select">
+        @for (u of users(); track u.id) {
+          <div
+            class="user-select-item"
+            [class.active]="assignForm.userId === u.id"
+            (click)="assignForm.userId = u.id"
+          >
+            <div class="user-select-avatar">{{ getInitials(u.name) }}</div>
+            <div class="user-select-info">
+              <span class="user-select-name">{{ u.name }}</span>
+              <span class="user-select-username">@{{ u.username }}</span>
+            </div>
+            @if (assignForm.userId === u.id) {
+              <i class="pi pi-check-circle" style="color: #7c3aed; margin-left: auto;"></i>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Permisos a asignar *</label>
+      <div class="permissions-grid">
+        @for (perm of availablePermissions; track perm.key) {
+          <div
+            class="permission-toggle"
+            [class.active]="selectedPermissions.includes(perm.key)"
+            (click)="togglePermission(perm.key)"
+          >
+            <i class="pi"
+              [class.pi-check-circle]="selectedPermissions.includes(perm.key)"
+              [class.pi-circle]="!selectedPermissions.includes(perm.key)"
+            ></i>
+            <span>{{ perm.label }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancelar" [text]="true" styleClass="cancel-btn" (onClick)="showAssignDialog.set(false)" />
+    <p-button label="Asignar" styleClass="save-btn" (onClick)="assignUser()" />
+  </ng-template>
+</p-dialog>
+
+<!-- DIALOG MIEMBROS -->
+<p-dialog
+  header="Miembros del Grupo"
+  [visible]="showMembersDialog()"
+  (visibleChange)="showMembersDialog.set($event)"
+  [modal]="true"
+  [style]="{ width: '540px' }"
+  [draggable]="false"
+>
+  <div class="members-list">
+    @if (selectedGroupForMembers()?.members?.length > 0) {
+      @for (member of selectedGroupForMembers()?.members; track member.id) {
+        <div class="member-item">
+          <div class="member-avatar">{{ getInitials(getUserName(member.userId)) }}</div>
+          <div class="member-info">
+            <span class="member-name">{{ getUserName(member.userId) }}</span>
+            <span class="member-username">{{ getUserUsername(member.userId) }}</span>
+            <div class="member-permissions">
+              @for (perm of member.permissions; track perm) {
+                <span class="perm-chip">{{ getPermissionLabel(perm) }}</span>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    } @else {
+      <div class="empty-members">
+        <i class="pi pi-users"></i>
+        <p>No hay miembros en este grupo</p>
+      </div>
+    }
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cerrar" [text]="true" (onClick)="showMembersDialog.set(false)" />
+  </ng-template>
+</p-dialog>

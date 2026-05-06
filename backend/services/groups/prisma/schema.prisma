@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groupMembers  GroupMember[]
+  tickets       Ticket[]
+  logs          Log[]
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     GroupMember[]
+  tickets     Ticket[]
+}
+
+model GroupMember {
+  id          String   @id @default(uuid())
+  userId      String
+  groupId     String
+  permissions String[] 
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  group       Group    @relation(fields: [groupId], references: [id])
+
+  @@unique([userId, groupId])
+}
+
+model Ticket {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  status      TicketStatus @default(TODO)
+  priority    Priority     @default(MEDIUM)
+  groupId     String
+  assignedTo  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  group       Group        @relation(fields: [groupId], references: [id])
+  assignee    User?        @relation(fields: [assignedTo], references: [id])
+}
+
+model Log {
+  id         String   @id @default(uuid())
+  endpoint   String
+  method     String
+  userId     String?
+  ip         String?
+  statusCode Int
+  duration   Int?
+  error      String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model Metric {
+  id           String   @id @default(uuid())
+  endpoint     String
+  method       String
+  requestCount Int      @default(0)
+  avgDuration  Float    @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+enum TicketStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}

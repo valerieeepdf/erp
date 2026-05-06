@@ -1,0 +1,464 @@
+<p-toast />
+
+<div class="tickets-layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><i class="pi pi-ticket"></i></div>
+      <span class="logo-text">ERPJir</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item" routerLink="/dashboard">
+        <i class="pi pi-home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a class="nav-item active">
+        <i class="pi pi-list"></i>
+        <span>Tickets</span>
+      </a>
+      @if (permissionService.hasPermission('groups:manage')) {
+        <a class="nav-item" routerLink="/admin/groups">
+          <i class="pi pi-users"></i>
+          <span>Grupos</span>
+        </a>
+      }
+      @if (permissionService.hasPermission('users:manage')) {
+        <a class="nav-item" routerLink="/admin/users">
+          <i class="pi pi-user"></i>
+          <span>Usuarios</span>
+        </a>
+      }
+      <a class="nav-item" routerLink="/profile">
+        <i class="pi pi-id-card"></i>
+        <span>Perfil</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">{{ getInitials(user()?.name || '') }}</div>
+        <div class="user-details">
+          <span class="user-name">{{ user()?.name }}</span>
+          <span class="user-username">@{{ user()?.username }}</span>
+        </div>
+      </div>
+      <button class="logout-btn" (click)="logout()">
+        <i class="pi pi-power-off"></i> Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Tickets</h1>
+        <p>Gestiona los tickets de tu equipo</p>
+      </div>
+      <div class="header-actions">
+        <div class="view-toggle">
+          <button class="toggle-btn" [class.active]="viewMode() === 'kanban'" (click)="viewMode.set('kanban')">
+            <i class="pi pi-th-large"></i> Kanban
+          </button>
+          <button class="toggle-btn" [class.active]="viewMode() === 'list'" (click)="viewMode.set('list')">
+            <i class="pi pi-list"></i> Lista
+          </button>
+        </div>
+        <button *appHasPermission="'tickets:add'" class="add-btn" (click)="openCreateDialog()" [disabled]="!selectedGroup()">
+          <i class="pi pi-plus"></i> Agregar Ticket
+        </button>
+      </div>
+    </div>
+
+    <div class="group-bar">
+      <span class="group-label">Grupo:</span>
+      <div class="group-buttons">
+        @for (group of groups(); track group.id) {
+          <button class="group-btn" [class.active]="selectedGroup()?.id === group.id" (click)="onGroupSelect(group)">
+            {{ group.name }}
+          </button>
+        }
+        @if (groups().length === 0) {
+          <span class="no-groups">Sin grupos asignados</span>
+        }
+      </div>
+    </div>
+
+    <div class="filters-bar">
+      <div class="search-box">
+        <i class="pi pi-search"></i>
+        <input type="text" [(ngModel)]="searchText" (ngModelChange)="applyFilters()" placeholder="Buscar tickets..." />
+      </div>
+      <select class="filter-select" [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()">
+        <option value="">Todos los estados</option>
+        <option value="TODO">Por Hacer</option>
+        <option value="IN_PROGRESS">En Progreso</option>
+        <option value="DONE">Completado</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="filterPriority" (ngModelChange)="applyFilters()">
+        <option value="">Todas las prioridades</option>
+        <option value="HIGH">Alta</option>
+        <option value="MEDIUM">Media</option>
+        <option value="LOW">Baja</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="filterAssigned" (ngModelChange)="applyFilters()">
+        <option value="">Todos los asignados</option>
+        @for (u of users(); track u.id) {
+          <option [value]="u.id">{{ u.name }}</option>
+        }
+      </select>
+      @if (filterStatus || filterPriority || filterAssigned || searchText) {
+        <button class="clear-btn" (click)="filterStatus=''; filterPriority=''; filterAssigned=''; searchText=''; applyFilters()">
+          <i class="pi pi-times"></i> Limpiar
+        </button>
+      }
+    </div>
+
+    @if (viewMode() === 'kanban') {
+      <div class="kanban-board">
+
+        <!-- TODO -->
+        <div class="kanban-column">
+          <div class="column-header todo">
+            <span class="column-title">To-Do</span>
+            <span class="column-count">{{ todoTickets.length }}</span>
+          </div>
+          <div class="column-cards"
+            cdkDropList
+            id="todo-list"
+            [cdkDropListData]="todoTickets"
+            [cdkDropListConnectedTo]="['progress-list', 'done-list']"
+            (cdkDropListDropped)="onDrop($event, 'TODO')">
+            @for (ticket of todoTickets; track ticket.id) {
+              <div class="ticket-card" cdkDrag [cdkDragDisabled]="!canMoveTicket(ticket)">
+                <div class="ticket-priority" [style.background]="getPriorityColor(ticket.priority)"></div>
+                <div class="ticket-body">
+                  <h4>{{ ticket.title }}</h4>
+                  @if (ticket.description) { <p>{{ ticket.description }}</p> }
+                  <div class="ticket-footer">
+                    <span class="priority-badge" [style.color]="getPriorityColor(ticket.priority)">{{ getPriorityLabel(ticket.priority) }}</span>
+                    <div class="ticket-actions">
+                      @if (ticket.assignedTo) {
+                        <div class="assignee-info">
+                          <span class="assignee-badge" [title]="getUserName(ticket.assignedTo)">{{ getInitials(getUserName(ticket.assignedTo)) }}</span>
+                          <span class="assignee-name">{{ getUserName(ticket.assignedTo) }}</span>
+                        </div>
+                      }
+                      <button class="edit-ticket-btn" (click)="openEditDialog(ticket)">
+                        <i class="pi pi-pencil"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+            @if (todoTickets.length === 0) {
+              <div class="empty-column"><i class="pi pi-inbox"></i><span>Sin tickets</span></div>
+            }
+          </div>
+        </div>
+
+        <!-- IN PROGRESS -->
+        <div class="kanban-column">
+          <div class="column-header progress">
+            <span class="column-title">En Progreso</span>
+            <span class="column-count">{{ inProgressTickets.length }}</span>
+          </div>
+          <div class="column-cards"
+            cdkDropList
+            id="progress-list"
+            [cdkDropListData]="inProgressTickets"
+            [cdkDropListConnectedTo]="['todo-list', 'done-list']"
+            (cdkDropListDropped)="onDrop($event, 'IN_PROGRESS')">
+            @for (ticket of inProgressTickets; track ticket.id) {
+              <div class="ticket-card" cdkDrag [cdkDragDisabled]="!canMoveTicket(ticket)">
+                <div class="ticket-priority" [style.background]="getPriorityColor(ticket.priority)"></div>
+                <div class="ticket-body">
+                  <h4>{{ ticket.title }}</h4>
+                  @if (ticket.description) { <p>{{ ticket.description }}</p> }
+                  <div class="ticket-footer">
+                    <span class="priority-badge" [style.color]="getPriorityColor(ticket.priority)">{{ getPriorityLabel(ticket.priority) }}</span>
+                    <div class="ticket-actions">
+                      @if (ticket.assignedTo) {
+                        <div class="assignee-info">
+                          <span class="assignee-badge" [title]="getUserName(ticket.assignedTo)">{{ getInitials(getUserName(ticket.assignedTo)) }}</span>
+                          <span class="assignee-name">{{ getUserName(ticket.assignedTo) }}</span>
+                        </div>
+                      }
+                      <button class="edit-ticket-btn" (click)="openEditDialog(ticket)">
+                        <i class="pi pi-pencil"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+            @if (inProgressTickets.length === 0) {
+              <div class="empty-column"><i class="pi pi-spin pi-spinner"></i><span>Sin tickets</span></div>
+            }
+          </div>
+        </div>
+
+        <!-- DONE -->
+        <div class="kanban-column">
+          <div class="column-header done">
+            <span class="column-title">Completado</span>
+            <span class="column-count">{{ doneTickets.length }}</span>
+          </div>
+          <div class="column-cards"
+            cdkDropList
+            id="done-list"
+            [cdkDropListData]="doneTickets"
+            [cdkDropListConnectedTo]="['todo-list', 'progress-list']"
+            (cdkDropListDropped)="onDrop($event, 'DONE')">
+            @for (ticket of doneTickets; track ticket.id) {
+              <div class="ticket-card" cdkDrag [cdkDragDisabled]="!canMoveTicket(ticket)">
+                <div class="ticket-priority" [style.background]="getPriorityColor(ticket.priority)"></div>
+                <div class="ticket-body">
+                  <h4>{{ ticket.title }}</h4>
+                  @if (ticket.description) { <p>{{ ticket.description }}</p> }
+                  <div class="ticket-footer">
+                    <span class="priority-badge" [style.color]="getPriorityColor(ticket.priority)">{{ getPriorityLabel(ticket.priority) }}</span>
+                    <div class="ticket-actions">
+                      @if (ticket.assignedTo) {
+                        <div class="assignee-info">
+                          <span class="assignee-badge" [title]="getUserName(ticket.assignedTo)">{{ getInitials(getUserName(ticket.assignedTo)) }}</span>
+                          <span class="assignee-name">{{ getUserName(ticket.assignedTo) }}</span>
+                        </div>
+                      }
+                      <button class="edit-ticket-btn" (click)="openEditDialog(ticket)">
+                        <i class="pi pi-pencil"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+            @if (doneTickets.length === 0) {
+              <div class="empty-column"><i class="pi pi-check-circle"></i><span>Sin tickets</span></div>
+            }
+          </div>
+        </div>
+
+      </div>
+    }
+
+    @if (viewMode() === 'list') {
+      <div class="list-view">
+        <p-table [value]="filteredTickets" [paginator]="true" [rows]="10" [rowsPerPageOptions]="[5, 10, 25]" [sortMode]="'single'" styleClass="p-datatable-sm">
+          <ng-template pTemplate="header">
+            <tr>
+              <th pSortableColumn="id">ID <p-sortIcon field="id" /></th>
+              <th pSortableColumn="title">Título <p-sortIcon field="title" /></th>
+              <th pSortableColumn="status">Estado <p-sortIcon field="status" /></th>
+              <th pSortableColumn="priority">Prioridad <p-sortIcon field="priority" /></th>
+              <th>Asignado</th>
+              <th>Grupo</th>
+              <th pSortableColumn="createdAt">Fecha <p-sortIcon field="createdAt" /></th>
+              <th>Acciones</th>
+            </tr>
+            <tr>
+              <th></th>
+              <th><input pInputText type="text" [(ngModel)]="searchText" (ngModelChange)="applyFilters()" placeholder="Buscar..." class="w-full" style="font-size: 0.8rem;" /></th>
+              <th>
+                <select class="filter-select w-full" [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()">
+                  <option value="">Todos</option>
+                  <option value="TODO">Por Hacer</option>
+                  <option value="IN_PROGRESS">En Progreso</option>
+                  <option value="DONE">Completado</option>
+                </select>
+              </th>
+              <th>
+                <select class="filter-select w-full" [(ngModel)]="filterPriority" (ngModelChange)="applyFilters()">
+                  <option value="">Todas</option>
+                  <option value="HIGH">Alta</option>
+                  <option value="MEDIUM">Media</option>
+                  <option value="LOW">Baja</option>
+                </select>
+              </th>
+              <th>
+                <select class="filter-select w-full" [(ngModel)]="filterAssigned" (ngModelChange)="applyFilters()">
+                  <option value="">Todos</option>
+                  @for (u of users(); track u.id) {
+                    <option [value]="u.id">{{ u.name }}</option>
+                  }
+                </select>
+              </th>
+              <th></th>
+              <th></th>
+              <th></th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-ticket>
+            <tr>
+              <td><span class="id-badge">{{ ticket.id.slice(0, 8) }}</span></td>
+              <td>{{ ticket.title }}</td>
+              <td><span class="status-badge {{ ticket.status.toLowerCase() }}">{{ getStatusLabel(ticket.status) }}</span></td>
+              <td>
+                <span class="priority-dot" [style.background]="getPriorityColor(ticket.priority)"></span>
+                {{ getPriorityLabel(ticket.priority) }}
+              </td>
+              <td>{{ getUserName(ticket.assignedTo) }}</td>
+              <td>{{ getGroupName(ticket.groupId) }}</td>
+              <td>{{ ticket.createdAt | date:'dd/MM/yyyy' }}</td>
+              <td>
+                <div style="display:flex; gap:0.4rem;">
+                  <button class="action-btn" (click)="openEditDialog(ticket)">
+                    <i class="pi pi-pencil"></i>
+                  </button>
+                  @if (canMoveTicket(ticket) && ticket.status !== 'DONE') {
+                    <button class="action-btn" (click)="moveTicketFromList(ticket)">
+                      <i class="pi pi-arrow-right"></i>
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr><td colspan="8" class="empty-table">Sin tickets que coincidan</td></tr>
+          </ng-template>
+        </p-table>
+      </div>
+    }
+
+  </main>
+</div>
+
+<!-- DIALOG CREAR TICKET -->
+<p-dialog header="Nuevo Ticket" [visible]="showDialog()" (visibleChange)="showDialog.set($event)" [modal]="true" [style]="{ width: '500px' }" [draggable]="false">
+  <div class="dialog-form">
+    <div class="field">
+      <label>Título *</label>
+      <input pInputText [(ngModel)]="newTicket.title" placeholder="Ej: Error en login de usuario" class="w-full" />
+    </div>
+    <div class="field">
+      <label>Descripción</label>
+      <textarea pTextarea [(ngModel)]="newTicket.description" placeholder="Detalles del ticket..." rows="3" class="w-full"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Estado inicial</label>
+        <p-select [(ngModel)]="newTicket.status" [options]="statuses" optionLabel="label" optionValue="value" styleClass="w-full" />
+      </div>
+      <div class="field">
+        <label>Prioridad</label>
+        <p-select [(ngModel)]="newTicket.priority" [options]="priorities" optionLabel="label" optionValue="value" styleClass="w-full" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Asignar a</label>
+      <div class="users-list-select">
+        <div class="user-select-item" [class.active]="newTicket.assignedTo === ''" (click)="newTicket.assignedTo = ''">
+          <div class="user-select-avatar" style="background: #9ca3af;"><i class="pi pi-user"></i></div>
+          <div class="user-select-info"><span class="user-select-name">Sin asignar</span></div>
+          @if (newTicket.assignedTo === '') {
+            <i class="pi pi-check-circle" style="color: #7c3aed; margin-left: auto;"></i>
+          }
+        </div>
+        @for (u of users(); track u.id) {
+          <div class="user-select-item" [class.active]="newTicket.assignedTo === u.id" (click)="newTicket.assignedTo = u.id">
+            <div class="user-select-avatar">{{ getInitials(u.name) }}</div>
+            <div class="user-select-info">
+              <span class="user-select-name">{{ u.name }}</span>
+              <span class="user-select-username">@{{ u.username }}</span>
+            </div>
+            @if (newTicket.assignedTo === u.id) {
+              <i class="pi pi-check-circle" style="color: #7c3aed; margin-left: auto;"></i>
+            }
+          </div>
+        }
+      </div>
+    </div>
+    <div class="field">
+      <label>Fecha límite *</label>
+      <input type="datetime-local" [(ngModel)]="newTicket.dueDate" class="date-input w-full" [min]="minDate" />
+      @if (newTicket.dueDate && !isValidDate(newTicket.dueDate)) {
+        <small class="error-msg">Debes seleccionar fecha y hora completas</small>
+      }
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancelar" styleClass="cancel-btn" [text]="true" (onClick)="showDialog.set(false)" />
+    <p-button label="Crear Ticket" icon="pi pi-check" styleClass="create-btn" (onClick)="confirmCreate()" />
+  </ng-template>
+</p-dialog>
+
+<!-- CONFIRM DIALOG -->
+<p-dialog header="Confirmar creación" [visible]="showConfirmDialog()" (visibleChange)="showConfirmDialog.set($event)" [modal]="true" [style]="{ width: '400px' }" [draggable]="false">
+  <div class="confirm-content">
+    <i class="pi pi-ticket confirm-icon"></i>
+    <p>¿Estás seguro de crear el ticket?</p>
+    <div class="confirm-details">
+      <div class="confirm-row">
+        <span class="confirm-label">Título:</span>
+        <span>{{ newTicket.title }}</span>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-label">Prioridad:</span>
+        <span>{{ getPriorityLabel(newTicket.priority) }}</span>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-label">Estado:</span>
+        <span>{{ getStatusLabel(newTicket.status || 'TODO') }}</span>
+      </div>
+      @if (newTicket.dueDate) {
+        <div class="confirm-row">
+          <span class="confirm-label">Fecha límite:</span>
+          <span>{{ newTicket.dueDate | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+      }
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancelar" [text]="true" styleClass="cancel-btn" (onClick)="showConfirmDialog.set(false)" />
+    <p-button label="Sí, crear ticket" icon="pi pi-check" styleClass="create-btn" (onClick)="createTicket()" />
+  </ng-template>
+</p-dialog>
+
+<!-- DIALOG EDITAR TICKET -->
+<p-dialog header="Editar Ticket" [visible]="showEditDialog()" (visibleChange)="showEditDialog.set($event)" [modal]="true" [style]="{ width: '500px' }" [draggable]="false">
+  <div class="dialog-form">
+    <div class="field">
+      <label>Título *</label>
+      <input pInputText [(ngModel)]="editTicketForm.title" placeholder="Título del ticket" class="w-full" />
+    </div>
+    <div class="field">
+      <label>Descripción</label>
+      <textarea pTextarea [(ngModel)]="editTicketForm.description" placeholder="Descripción opcional" rows="3" class="w-full"></textarea>
+    </div>
+    <div class="field">
+      <label>Prioridad</label>
+      <p-select [(ngModel)]="editTicketForm.priority" [options]="priorities" optionLabel="label" optionValue="value" styleClass="w-full" />
+    </div>
+    <div class="field">
+      <label>Asignar a</label>
+      <div class="users-list-select">
+        <div class="user-select-item" [class.active]="editTicketForm.assignedTo === ''" (click)="editTicketForm.assignedTo = ''">
+          <div class="user-select-avatar" style="background: #9ca3af;"><i class="pi pi-user"></i></div>
+          <div class="user-select-info"><span class="user-select-name">Sin asignar</span></div>
+          @if (editTicketForm.assignedTo === '') {
+            <i class="pi pi-check-circle" style="color: #7c3aed; margin-left: auto;"></i>
+          }
+        </div>
+        @for (u of users(); track u.id) {
+          <div class="user-select-item" [class.active]="editTicketForm.assignedTo === u.id" (click)="editTicketForm.assignedTo = u.id">
+            <div class="user-select-avatar">{{ getInitials(u.name) }}</div>
+            <div class="user-select-info">
+              <span class="user-select-name">{{ u.name }}</span>
+              <span class="user-select-username">@{{ u.username }}</span>
+            </div>
+            @if (editTicketForm.assignedTo === u.id) {
+              <i class="pi pi-check-circle" style="color: #7c3aed; margin-left: auto;"></i>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Cancelar" [text]="true" styleClass="cancel-btn" (onClick)="showEditDialog.set(false)" />
+    <p-button label="Guardar cambios" icon="pi pi-check" styleClass="create-btn" (onClick)="saveTicket()" />
+  </ng-template>
+</p-dialog>
