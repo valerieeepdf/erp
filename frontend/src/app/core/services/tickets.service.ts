@@ -12,9 +12,13 @@ export class TicketsService {
   ) {}
 
   private getGroupHeaders() {
-    const groupId = this.permissionService.getCurrentGroupId();
-    return new HttpHeaders({ 'x-group-id': groupId });
-  }
+  const groupId = this.permissionService.getCurrentGroupId();
+  const permissions = this.permissionService.getCurrentPermissions();
+  return new HttpHeaders({ 
+    'x-group-id': groupId,
+    'x-user-permissions': JSON.stringify(permissions),
+  });
+}
 
   getTickets(groupId?: string) {
   const params: Record<string, string> = {};

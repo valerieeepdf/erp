@@ -18,17 +18,17 @@
       <a class="nav-item active" routerLink="/profile"><i class="pi pi-id-card"></i><span>Perfil</span></a>
     </nav>
     <div class="sidebar-footer">
-  <div class="user-info">
-    <div class="user-avatar">{{ getInitials(user()?.name || '') }}</div>
-    <div class="user-details">
-      <span class="user-name">{{ user()?.name }}</span>
-      <span class="user-username">@{{ user()?.username }}</span>
+      <div class="user-info">
+        <div class="user-avatar">{{ getInitials(user()?.name || '') }}</div>
+        <div class="user-details">
+          <span class="user-name">{{ user()?.name }}</span>
+          <span class="user-username">@{{ user()?.username }}</span>
+        </div>
+      </div>
+      <button class="logout-btn" (click)="logout()">
+        <i class="pi pi-power-off"></i> Cerrar sesión
+      </button>
     </div>
-  </div>
-  <button class="logout-btn" (click)="logout()">
-    <i class="pi pi-power-off"></i> Cerrar sesión
-  </button>
-</div>
   </aside>
 
   <main class="main-content">
@@ -126,6 +126,11 @@
           <div class="section-header">
             <i class="pi pi-shield"></i>
             <h3>Accesos y Permisos</h3>
+            @if (permissionService.getCurrentGroupId()) {
+              <span style="margin-left: auto; background: #f0eeff; color: #7c3aed; padding: 0.2rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 600;">
+                Grupo: {{ myGroups().find(g => g.id === permissionService.getCurrentGroupId())?.name || '' }}
+              </span>
+            }
           </div>
           <table class="perms-table">
             <thead>

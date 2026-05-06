@@ -107,7 +107,21 @@ async function ticketRoutes(fastify, options) {
 function getAuth(request) {
   const user = request.user;
   const groupId = request.headers['x-group-id'] || '';
-  const permissions = user.permissionsByGroup?.[groupId] || [];
+  
+  // Leer permisos frescos del header enviado por el frontend
+  const headerPermissions = request.headers['x-user-permissions'];
+  let permissions = [];
+  
+  if (headerPermissions) {
+    try {
+      permissions = JSON.parse(headerPermissions);
+    } catch (e) {
+      permissions = user.permissionsByGroup?.[groupId] || [];
+    }
+  } else {
+    permissions = user.permissionsByGroup?.[groupId] || [];
+  }
+  
   return { user, permissions };
 }
 

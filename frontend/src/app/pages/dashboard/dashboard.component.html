@@ -53,33 +53,29 @@
   <main class="main-content">
 
     <!-- HERO HEADER -->
-    <div class="hero-header">
-      <div class="hero-content">
-        <h1>Bienvenido, {{ user()?.name }} 👋</h1>
-        <p>{{ today | date:'EEEE, d \'de\' MMMM \'de\' yyyy' }}</p>
-      </div>
-      <div class="group-selector">
-        <span class="group-label">Grupo activo:</span>
-        <div class="group-buttons">
-          @for (group of groups(); track group.id) {
-            <button
-              class="group-btn"
-              [class.active]="selectedGroup()?.id === group.id"
-              (click)="onGroupSelect(group)"
-            >
-              {{ group.name }}
-            </button>
-          }
-          @if (groups().length === 0) {
-            <span class="no-groups">Sin grupos asignados</span>
-          }
-        </div>
-        <button class="goto-kanban-btn" (click)="goToTickets()">
-          <i class="pi pi-th-large"></i> Ir al Kanban
-        </button>
-      </div>
-    </div>
-
+<div class="hero-header">
+  <div class="hero-content">
+    <h1>Bienvenido, {{ user()?.name }} 👋</h1>
+    <p>{{ today | date:'EEEE, d \'de\' MMMM \'de\' yyyy' }}</p>
+  </div>
+  <div class="group-selector">
+    <span class="group-label"><i class="pi pi-sitemap"></i> WORKSPACE ACTIVO</span>
+    @if (groups().length === 1) {
+      <div class="group-single">{{ selectedGroup()?.name }}</div>
+    } @else if (groups().length > 1) {
+      <select class="group-dropdown" (change)="onGroupSelectById($event)">
+        @for (group of groups(); track group.id) {
+          <option [value]="group.id" [selected]="selectedGroup()?.id === group.id">
+            {{ group.name }}
+          </option>
+        }
+      </select>
+    }
+    <button class="goto-kanban-btn" (click)="goToTickets()">
+      <i class="pi pi-th-large"></i> Ir al Kanban
+    </button>
+  </div>
+</div>
     <!-- STATS CARDS -->
     <div class="stats-grid">
       <div class="stat-card total">

@@ -12,9 +12,13 @@ export class GroupsService {
   ) {}
 
   private getGroupHeaders() {
-    const groupId = this.permissionService.getCurrentGroupId();
-    return new HttpHeaders({ 'x-group-id': groupId });
-  }
+  const groupId = this.permissionService.getCurrentGroupId();
+  const permissions = this.permissionService.getCurrentPermissions();
+  return new HttpHeaders({ 
+    'x-group-id': groupId,
+    'x-user-permissions': JSON.stringify(permissions),
+  });
+}
 
   getAllGroups() {
     return this.http.get<any>(`${API}/groups`, {
@@ -51,4 +55,5 @@ export class GroupsService {
       headers: this.getGroupHeaders(),
     });
   }
+  
 }

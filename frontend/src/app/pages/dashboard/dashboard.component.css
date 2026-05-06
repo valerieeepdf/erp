@@ -549,3 +549,30 @@
   border-top: 1px solid #f3f4f6;
   flex-shrink: 0;
 }
+
+.group-dropdown {
+  padding: 0.4rem 1rem;
+  border-radius: 50px;
+  border: 1.5px solid rgba(255,255,255,0.4);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: white;
+  outline: none;
+  min-width: 150px;
+}
+
+.group-dropdown option {
+  color: #1a1a2e;
+  background: white;
+}
+
+.group-single {
+  padding: 0.4rem 1rem;
+  border-radius: 50px;
+  border: 1.5px solid rgba(255,255,255,0.4);
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: white;
+}

@@ -55,7 +55,13 @@ export class ProfileComponent implements OnInit {
   this.user.set(u);
   this.form = { name: u?.name || '', email: u?.email || '', username: u?.username || '' };
 
-  // Cargar grupos y permisos frescos desde el backend
+  // Usar el grupo activo del permissionService
+  const activeGroupId = this.permissionService.getCurrentGroupId();
+  
+  if (activeGroupId) {
+    this.permissionService.refreshPermissionsForGroup(activeGroupId);
+  }
+
   this.loadMyGroups();
 }
 
@@ -66,10 +72,11 @@ loadMyGroups() {
     next: (res: any) => {
       this.myGroups.set(res.data || []);
       if (res.data?.length > 0) {
-        // Refrescar permisos desde BD
-        const groupId = res.data[0].id;
-        this.permissionService.refreshPermissionsForGroup(groupId);
-        this.loadMyTickets(groupId);
+        // Usar el grupo activo si existe, si no el primero
+        const activeGroupId = this.permissionService.getCurrentGroupId();
+        const activeGroup = res.data.find((g: any) => g.id === activeGroupId) || res.data[0];
+        this.permissionService.refreshPermissionsForGroup(activeGroup.id);
+        this.loadMyTickets(activeGroup.id);
       }
     },
   });
